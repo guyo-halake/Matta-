@@ -87,14 +87,7 @@ export async function processUserMessage(
           const toolResult = await executeToolCall(chatId, functionName, functionArgs);
 
           try {
-            result = await chat.sendMessage([
-              {
-                functionResponse: {
-                  name: functionName,
-                  response: { output: toolResult },
-                },
-              },
-            ]);
+            result = await chat.sendMessage(`[Tool Output for ${functionName}]:\n${toolResult}`);
             response = await result.response;
             functionCalls = response.functionCalls();
           } catch (toolError: any) {
