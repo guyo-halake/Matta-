@@ -25,7 +25,7 @@ export async function performDailyAutoCommit(): Promise<string> {
 
 **Last Updated:** ${dateStr} at ${timeStr} (EAT)  
 **Host Machine:** Windows 11 PC (Local Home Server)  
-**Bot Status:** Active & Online (@fv_rzkbot)  
+**Bot Status:** Active & Online (\`@fv_rzkbot\`)  
 
 ---
 
