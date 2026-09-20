@@ -1,6 +1,12 @@
 import { FunctionDeclaration, SchemaType } from '@google/generative-ai';
 import { ChatCompletionTool } from 'openai/resources/chat/completions.js';
-import { getUnifiedSchedule, createGoogleCalendarEvent } from '../services/calendar.js';
+import {
+  getUnifiedSchedule,
+  getTodayClasses,
+  createCalendarEvent,
+  editCalendarEvent,
+  deleteCalendarEvent,
+} from '../services/calendar.js';
 import { getWeather } from '../services/weather.js';
 import { saveUserFact } from '../agent/memory.js';
 import { getDb, saveDb } from '../db/database.js';
@@ -92,16 +98,26 @@ export const geminiTools: FunctionDeclaration[] = [
     },
   },
   {
-    name: 'get_calendar_schedule',
-    description: 'Fetch upcoming calendar events, classes, and meetings from Google Calendar and Apple iCal.',
+    name: 'get_today_classes',
+    description: 'Get today\'s academic classes and scheduled events.',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {},
     },
   },
   {
+    name: 'get_calendar_schedule',
+    description: 'Fetch upcoming calendar events, classes, and meetings from iCloud iCal, Google Calendar, and Local Schedule.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        daysAhead: { type: SchemaType.NUMBER, description: 'Number of days ahead to search (default 7)' },
+      },
+    },
+  },
+  {
     name: 'create_calendar_event',
-    description: 'Schedule a new event, class, or meeting on Google Calendar.',
+    description: 'Schedule a new event, class, or meeting on Google Calendar and local schedule.',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -109,8 +125,36 @@ export const geminiTools: FunctionDeclaration[] = [
         startTimeIso: { type: SchemaType.STRING, description: 'Start time ISO format (e.g. 2026-09-21T10:00:00Z)' },
         endTimeIso: { type: SchemaType.STRING, description: 'End time ISO format (e.g. 2026-09-21T11:00:00Z)' },
         description: { type: SchemaType.STRING, description: 'Optional details or notes' },
+        location: { type: SchemaType.STRING, description: 'Optional location' },
       },
       required: ['summary', 'startTimeIso', 'endTimeIso'],
+    },
+  },
+  {
+    name: 'edit_calendar_event',
+    description: 'Edit or update an existing event or class in your schedule.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        idOrSummary: { type: SchemaType.STRING, description: 'Event ID or matching title string' },
+        summary: { type: SchemaType.STRING, description: 'New title' },
+        startTimeIso: { type: SchemaType.STRING, description: 'New start time ISO format' },
+        endTimeIso: { type: SchemaType.STRING, description: 'New end time ISO format' },
+        description: { type: SchemaType.STRING, description: 'New description' },
+        location: { type: SchemaType.STRING, description: 'New location' },
+      },
+      required: ['idOrSummary'],
+    },
+  },
+  {
+    name: 'delete_calendar_event',
+    description: 'Delete an event or class from your schedule by ID or title.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        idOrSummary: { type: SchemaType.STRING, description: 'Event ID or matching title string to delete' },
+      },
+      required: ['idOrSummary'],
     },
   },
   {
@@ -251,11 +295,75 @@ export const agentTools: ChatCompletionTool[] = [
   {
     type: 'function',
     function: {
+      name: 'get_today_classes',
+      description: 'Get today\'s academic classes and scheduled events.',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'get_calendar_schedule',
       description: 'Fetch upcoming calendar events.',
       parameters: {
         type: 'object',
-        properties: {},
+        properties: {
+          daysAhead: { type: 'number', description: 'Days ahead to fetch' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_calendar_event',
+      description: 'Create an event on calendar and local schedule.',
+      parameters: {
+        type: 'object',
+        properties: {
+          summary: { type: 'string', description: 'Event title' },
+          startTimeIso: { type: 'string', description: 'Start time ISO string' },
+          endTimeIso: { type: 'string', description: 'End time ISO string' },
+          description: { type: 'string', description: 'Optional description' },
+          location: { type: 'string', description: 'Optional location' },
+        },
+        required: ['summary', 'startTimeIso', 'endTimeIso'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'edit_calendar_event',
+      description: 'Edit an existing event in your schedule.',
+      parameters: {
+        type: 'object',
+        properties: {
+          idOrSummary: { type: 'string', description: 'Event ID or title string' },
+          summary: { type: 'string', description: 'New title' },
+          startTimeIso: { type: 'string', description: 'New start time ISO' },
+          endTimeIso: { type: 'string', description: 'New end time ISO' },
+          description: { type: 'string', description: 'New description' },
+          location: { type: 'string', description: 'New location' },
+        },
+        required: ['idOrSummary'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_calendar_event',
+      description: 'Delete an event from your schedule.',
+      parameters: {
+        type: 'object',
+        properties: {
+          idOrSummary: { type: 'string', description: 'Event ID or title string' },
+        },
+        required: ['idOrSummary'],
       },
     },
   },
@@ -310,21 +418,46 @@ export async function executeToolCall(
       return await getWindowsSystemHealth();
     }
 
+    case 'get_today_classes': {
+      const classes = await getTodayClasses();
+      if (classes.length === 0) return 'No classes or events scheduled for today.';
+      return JSON.stringify(classes, null, 2);
+    }
+
     case 'get_calendar_schedule': {
-      const events = await getUnifiedSchedule();
-      if (events.length === 0) return 'No upcoming calendar events found for the next 7 days.';
+      const daysAhead = args.daysAhead || 7;
+      const now = new Date();
+      const endWindow = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+      const events = await getUnifiedSchedule(now, endWindow);
+      if (events.length === 0) return `No upcoming calendar events found for the next ${daysAhead} days.`;
       return JSON.stringify(events, null, 2);
     }
 
     case 'create_calendar_event': {
-      const success = await createGoogleCalendarEvent(
+      const res = await createCalendarEvent(
         args.summary,
         args.startTimeIso,
         args.endTimeIso,
-        args.description
+        args.description,
+        args.location
       );
-      if (success) return `Successfully scheduled "${args.summary}" on Google Calendar!`;
-      return `Logged event request: "${args.summary}" at ${args.startTimeIso}.`;
+      return res.message;
+    }
+
+    case 'edit_calendar_event': {
+      const res = await editCalendarEvent(args.idOrSummary, {
+        summary: args.summary,
+        startTimeIso: args.startTimeIso,
+        endTimeIso: args.endTimeIso,
+        description: args.description,
+        location: args.location,
+      });
+      return res.message;
+    }
+
+    case 'delete_calendar_event': {
+      const res = await deleteCalendarEvent(args.idOrSummary);
+      return res.message;
     }
 
     case 'get_weather_forecast': {
