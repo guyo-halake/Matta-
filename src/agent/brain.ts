@@ -35,10 +35,15 @@ export async function processUserMessage(
   const systemInstruction = getSystemPrompt(userFacts);
   const recentHistory = getRecentHistory(chatId, 12);
 
-  const candidateGeminiModels = [
-    config.geminiModel || 'gemini-3.6-flash',
-    'gemini-3.6-flash',
-  ];
+  const candidateGeminiModels = Array.from(
+    new Set([
+      config.geminiModel,
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-1.5-pro',
+    ].filter(Boolean))
+  );
 
   const rawHistory = recentHistory.slice(0, -1).map((h) => ({
     role: h.role === 'user' ? 'user' : 'model',
