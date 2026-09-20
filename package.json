@@ -1,37 +1,43 @@
 {
-  "name": "OdinBot",
-  "version": "1.0.0",
-  "description": "Bot that helps you.",
-  "main": "index.js",
+  "name": "odin-jarvis-bot",
+  "version": "2.0.0",
+  "description": "Autonomous Gemini-powered AI Assistant & Remote Vibe-Coding OS for Telegram",
+  "main": "dist/index.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "bot": "nodemon -r dotenv/config index.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": ""
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "ask": "tsx src/cli.ts",
+    "start": "node dist/index.js"
   },
   "keywords": [
-    "chatbot",
-    "nlp",
-    "nodejs",
-    "iot"
+    "telegram-bot",
+    "ai-assistant",
+    "jarvis",
+    "gemini",
+    "vibe-coding",
+    "whisper",
+    "tts",
+    "calendar",
+    "windows-control"
   ],
-  "author": "Orange Gate",
-  "license": "ISC",
-  "bugs": {
-    "url": ""
-  },
-  "homepage": "",
+  "author": "P3L Developers",
+  "license": "MIT",
   "dependencies": {
-    "dotenv": "^8.0.0",
-    "natural": "^0.6.3",
-    "node-nlp": "^3.1.1",
-    "node-telegram-bot-api": "^0.30.0",
-    "nodemon": "^1.19.1",
-    "request": "^2.88.0"
+    "@google/generative-ai": "^0.22.0",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
+    "googleapis": "^144.0.0",
+    "grammy": "^1.34.0",
+    "node-cron": "^3.0.3",
+    "node-ical": "^0.20.1",
+    "openai": "^4.85.3",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
-    "dotenv": "^8.0.0"
+    "@types/node": "^22.13.4",
+    "@types/node-cron": "^3.0.11",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
   }
 }
