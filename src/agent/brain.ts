@@ -69,48 +69,55 @@ export async function processUserMessage(
     const aiInstance = new GoogleGenerativeAI(currentApiKey);
 
     for (const modelName of candidateGeminiModels) {
-      try {
-        console.log(`🤖 Executing Gemini Engine (Key #${keyIdx + 1}, Model: ${modelName})...`);
-        const model = aiInstance.getGenerativeModel({
-          model: modelName,
-          systemInstruction,
-          tools: [{ functionDeclarations: geminiTools }],
-        });
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          console.log(`🤖 Executing Gemini Engine (Key #${keyIdx + 1}, Model: ${modelName}, Attempt #${attempt})...`);
+          const model = aiInstance.getGenerativeModel({
+            model: modelName,
+            systemInstruction,
+            tools: [{ functionDeclarations: geminiTools }],
+          });
 
-        const chat = model.startChat({ history: cleanHistory });
+          const chat = model.startChat({ history: cleanHistory });
 
-        let result = await chat.sendMessage(userPrompt);
-        let response = await result.response;
+          let result = await chat.sendMessage(userPrompt);
+          let response = await result.response;
 
-        let functionCalls = response.functionCalls();
-        let loopCount = 0;
+          let functionCalls = response.functionCalls();
+          let loopCount = 0;
 
-        while (functionCalls && functionCalls.length > 0 && loopCount < 5) {
-          loopCount++;
-          const call = functionCalls[0];
-          const functionName = call.name;
-          const functionArgs = call.args;
+          while (functionCalls && functionCalls.length > 0 && loopCount < 5) {
+            loopCount++;
+            const call = functionCalls[0];
+            const functionName = call.name;
+            const functionArgs = call.args;
 
-          console.log(`🛠️ [Gemini Tool Executed]: ${functionName}`, functionArgs);
-          const toolResult = await executeToolCall(chatId, functionName, functionArgs);
+            console.log(`🛠️ [Gemini Tool Executed]: ${functionName}`, functionArgs);
+            const toolResult = await executeToolCall(chatId, functionName, functionArgs);
 
-          try {
-            result = await chat.sendMessage(`[Tool Output for ${functionName}]:\n${toolResult}`);
-            response = await result.response;
-            functionCalls = response.functionCalls();
-          } catch (toolError: any) {
-            console.warn(`⚠️ Tool response error for ${functionName}:`, toolError.message);
-            const formattedResult = `[Tool Executed (${functionName})]:\n${toolResult}`;
-            saveMessage(chatId, 'assistant', formattedResult);
-            return formattedResult;
+            try {
+              result = await chat.sendMessage(`[Tool Output for ${functionName}]:\n${toolResult}`);
+              response = await result.response;
+              functionCalls = response.functionCalls();
+            } catch (toolError: any) {
+              console.warn(`⚠️ Tool response error for ${functionName}:`, toolError.message);
+              const formattedResult = `[Tool Executed (${functionName})]:\n${toolResult}`;
+              saveMessage(chatId, 'assistant', formattedResult);
+              return formattedResult;
+            }
           }
-        }
 
-        const finalAnswer = response.text() || 'At your service, Razak.';
-        saveMessage(chatId, 'assistant', finalAnswer);
-        return finalAnswer;
-      } catch (error: any) {
-        console.warn(`⚠️ Gemini Key #${keyIdx + 1} ("${modelName}") error: ${error.message.slice(0, 150)}`);
+          const finalAnswer = response.text() || 'At your service, Razak.';
+          saveMessage(chatId, 'assistant', finalAnswer);
+          return finalAnswer;
+        } catch (error: any) {
+          console.warn(`⚠️ Gemini Key #${keyIdx + 1} ("${modelName}" attempt ${attempt}) error: ${error.message.slice(0, 150)}`);
+          if (error.message.includes('503') && attempt < 3) {
+            await new Promise((r) => setTimeout(r, 1500));
+            continue;
+          }
+          break;
+        }
       }
     }
   }
