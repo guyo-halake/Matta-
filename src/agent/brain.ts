@@ -180,7 +180,8 @@ export async function processUserMessage(
     }
   }
 
-  const fallback = `Sorry Razak, that feature or request encountered an error. Please verify configuration in .env.`;
+  const fallback = `⚠️ [System Notice for Razak]: Google Gemini API Free-Tier Daily Quota (20 requests/day) has been reached for today. 
+👉 You can add a second backup key (e.g. GEMINI_API_KEY_BACKUP=... or OPENAI_API_KEY=...) in .env, or wait for the quota window reset. All local CLI and machine tools remain fully functional!`;
   saveMessage(chatId, 'assistant', fallback);
   return fallback;
 }

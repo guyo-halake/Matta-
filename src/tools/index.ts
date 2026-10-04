@@ -22,6 +22,9 @@ import {
 import { searchWebDuckDuckGo } from '../services/webSearch.js';
 import { downloadFileFromUrl } from '../services/downloader.js';
 import { openBrowserUrl } from '../services/browserControl.js';
+import { runDependencySecurityAudit } from '../services/securityAudit.js';
+import { validateTerraformPlan, generateTerraformAwsVpc } from '../services/terraformProvisioner.js';
+import { generateAnkiDeckFromNotes, formatAnkiCsv } from '../services/ankiBuilder.js';
 
 export const geminiTools: FunctionDeclaration[] = [
   {
@@ -228,6 +231,40 @@ export const geminiTools: FunctionDeclaration[] = [
         browser: { type: SchemaType.STRING, description: 'Browser application (chrome, msedge, firefox)' },
       },
       required: ['url'],
+    },
+  },
+  {
+    name: 'run_security_audit',
+    description: 'Run automated CVE security audit on npm project dependencies.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        projectPath: { type: SchemaType.STRING, description: 'Optional project directory path' },
+      },
+    },
+  },
+  {
+    name: 'generate_terraform_vpc',
+    description: 'Generate production-grade Terraform IaC HCL manifest for AWS VPC and subnets.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        projectName: { type: SchemaType.STRING, description: 'Name of the project/infrastructure' },
+        region: { type: SchemaType.STRING, description: 'AWS region (default us-east-1)' },
+      },
+      required: ['projectName'],
+    },
+  },
+  {
+    name: 'generate_anki_deck',
+    description: 'Parse lecture notes or topics into structured Anki flashcards for KCA exam study.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        topic: { type: SchemaType.STRING, description: 'Subject or topic name' },
+        notesText: { type: SchemaType.STRING, description: 'Raw notes or bullet points' },
+      },
+      required: ['topic', 'notesText'],
     },
   },
 ];
@@ -533,6 +570,21 @@ export async function executeToolCall(
 
     case 'open_browser_url': {
       return await openBrowserUrl(args.url, args.browser);
+    }
+
+    case 'run_security_audit': {
+      const res = await runDependencySecurityAudit(args.projectPath);
+      return `🛡️ Security Audit Report:\n${res.summary}\n\n${res.rawOutput}`;
+    }
+
+    case 'generate_terraform_vpc': {
+      return await generateTerraformAwsVpc(args.projectName, args.region);
+    }
+
+    case 'generate_anki_deck': {
+      const cards = generateAnkiDeckFromNotes(args.topic, args.notesText);
+      const csv = formatAnkiCsv(cards);
+      return `📚 Generated ${cards.length} Anki Flashcards for [${args.topic}]:\n\n${csv}`;
     }
 
     default:
