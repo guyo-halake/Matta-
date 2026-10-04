@@ -6,7 +6,18 @@ dotenv.config();
 export const config = {
   telegramToken: process.env.TELEGRAM_BOT_TOKEN || '',
   geminiApiKey: process.env.GEMINI_API_KEY || '',
-  geminiModel: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
+  geminiApiKeyBackup: process.env.GEMINI_API_KEY_BACKUP || '',
+  geminiApiKeys: Array.from(
+    new Set(
+      [
+        ...(process.env.GEMINI_API_KEY || '').split(','),
+        process.env.GEMINI_API_KEY_BACKUP || '',
+      ]
+        .map((k) => k.trim())
+        .filter(Boolean)
+    )
+  ),
+  geminiModel: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   allowedTelegramUserId: process.env.ALLOWED_TELEGRAM_USER_ID || '',
   google: {

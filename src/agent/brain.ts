@@ -61,13 +61,17 @@ export async function processUserMessage(
     }
   }
 
-  // 1. Execute Gemini Engine
-  const ai = getGenAI();
-  if (ai) {
+  // 1. Execute Gemini Engine across Key pool & Model candidates
+  const keysToTry = config.geminiApiKeys.length > 0 ? config.geminiApiKeys : [config.geminiApiKey].filter(Boolean);
+
+  for (let keyIdx = 0; keyIdx < keysToTry.length; keyIdx++) {
+    const currentApiKey = keysToTry[keyIdx];
+    const aiInstance = new GoogleGenerativeAI(currentApiKey);
+
     for (const modelName of candidateGeminiModels) {
       try {
-        console.log(`🤖 Executing Gemini Engine (${modelName})...`);
-        const model = ai.getGenerativeModel({
+        console.log(`🤖 Executing Gemini Engine (Key #${keyIdx + 1}, Model: ${modelName})...`);
+        const model = aiInstance.getGenerativeModel({
           model: modelName,
           systemInstruction,
           tools: [{ functionDeclarations: geminiTools }],
@@ -96,7 +100,6 @@ export async function processUserMessage(
             functionCalls = response.functionCalls();
           } catch (toolError: any) {
             console.warn(`⚠️ Tool response error for ${functionName}:`, toolError.message);
-            // Return direct tool result if secondary message fails
             const formattedResult = `[Tool Executed (${functionName})]:\n${toolResult}`;
             saveMessage(chatId, 'assistant', formattedResult);
             return formattedResult;
@@ -107,7 +110,7 @@ export async function processUserMessage(
         saveMessage(chatId, 'assistant', finalAnswer);
         return finalAnswer;
       } catch (error: any) {
-        console.warn(`⚠️ Gemini model "${modelName}" error: ${error.message.slice(0, 150)}`);
+        console.warn(`⚠️ Gemini Key #${keyIdx + 1} ("${modelName}") error: ${error.message.slice(0, 150)}`);
       }
     }
   }
