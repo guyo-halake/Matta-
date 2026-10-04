@@ -1,4 +1,4 @@
-import { exec } from 'child_process';
+import { spawn, exec } from 'child_process';
 import util from 'util';
 import fs from 'fs';
 import path from 'path';
@@ -124,6 +124,54 @@ export async function writeRemoteFile(filePath: string, content: string): Promis
   } catch (err: any) {
     return `Error writing file: ${err.message}`;
   }
+}
+
+/**
+ * Execute command with interactive streaming output callbacks
+ */
+export async function executeStreamingWindowsCommand(
+  command: string,
+  onChunk: (output: string) => void,
+  cwd?: string
+): Promise<ExecutionResult> {
+  return new Promise((resolve) => {
+    const targetCwd = cwd ? (path.isAbsolute(cwd) ? cwd : path.resolve(process.cwd(), cwd)) : process.cwd();
+    let stdoutData = '';
+    let stderrData = '';
+
+    const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', command], {
+      cwd: targetCwd,
+      env: process.env,
+    });
+
+    child.stdout.on('data', (data: Buffer | string) => {
+      const chunk = data.toString();
+      stdoutData += chunk;
+      onChunk(`[stdout]: ${chunk}`);
+    });
+
+    child.stderr.on('data', (data: Buffer | string) => {
+      const chunk = data.toString();
+      stderrData += chunk;
+      onChunk(`[stderr]: ${chunk}`);
+    });
+
+    child.on('close', (code: number | null) => {
+      resolve({
+        stdout: stdoutData.trim() || '[No stdout]',
+        stderr: stderrData.trim(),
+        exitCode: code || 0,
+      });
+    });
+
+    child.on('error', (err: Error) => {
+      resolve({
+        stdout: stdoutData.trim(),
+        stderr: err.message,
+        exitCode: 1,
+      });
+    });
+  });
 }
 
 /**

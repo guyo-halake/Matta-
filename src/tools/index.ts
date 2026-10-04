@@ -19,6 +19,9 @@ import {
   executeGithubCommand,
   executeVercelCommand,
 } from './windowsControl.js';
+import { searchWebDuckDuckGo } from '../services/webSearch.js';
+import { downloadFileFromUrl } from '../services/downloader.js';
+import { openBrowserUrl } from '../services/browserControl.js';
 
 export const geminiTools: FunctionDeclaration[] = [
   {
@@ -190,6 +193,41 @@ export const geminiTools: FunctionDeclaration[] = [
         durationMinutes: { type: SchemaType.NUMBER, description: 'Focus duration in minutes (default 25)' },
       },
       required: ['taskName'],
+    },
+  },
+  {
+    name: 'web_search',
+    description: 'Perform real-time web search for facts, news, documentation, or links.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        query: { type: SchemaType.STRING, description: 'Search term or query' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'download_file_from_url',
+    description: 'Download any file or image from a direct URL to the user workspace folder.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        url: { type: SchemaType.STRING, description: 'Direct URL to download' },
+        customFilename: { type: SchemaType.STRING, description: 'Optional filename to save as' },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'open_browser_url',
+    description: 'Launch Google Chrome or host web browser and navigate to a URL.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        url: { type: SchemaType.STRING, description: 'Website URL to open' },
+        browser: { type: SchemaType.STRING, description: 'Browser application (chrome, msedge, firefox)' },
+      },
+      required: ['url'],
     },
   },
 ];
@@ -483,6 +521,18 @@ export async function executeToolCall(
       db.pomodoroSessions.push(session);
       saveDb();
       return `Pomodoro focus session "${args.taskName}" initiated for ${args.durationMinutes || 25} minutes.`;
+    }
+
+    case 'web_search': {
+      return await searchWebDuckDuckGo(args.query);
+    }
+
+    case 'download_file_from_url': {
+      return await downloadFileFromUrl(args.url, args.customFilename);
+    }
+
+    case 'open_browser_url': {
+      return await openBrowserUrl(args.url, args.browser);
     }
 
     default:

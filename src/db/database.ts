@@ -18,6 +18,8 @@ export interface DbSchema {
   pomodoroSessions: { id: number; chatId: string; taskName: string; duration: number; breakDuration: number; status: string; startedAt: string }[];
   reminders: { id: number; chatId: string; message: string; remindAt: string; isSent: boolean }[];
   customEvents: CustomCalendarEvent[];
+  customCrons?: any[];
+  userFacts?: any[];
 }
 
 const dbPath = path.resolve(process.cwd(), 'odin_jarvis_data.json');
